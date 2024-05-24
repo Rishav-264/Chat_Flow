@@ -1,0 +1,54 @@
+.container{
+    display: flex;
+}
+.sidebar{
+    width: 30vw;
+    padding: 1rem;
+    border: 1px solid gray;
+}
+
+.editSidebar{
+    width: 30vw;
+    border: 1px solid gray;
+}
+
+.node{
+    padding: 1rem 2rem;
+    border-radius: 1rem;
+    display: flex;
+    flex-direction: column;
+    border: 2px solid black;
+    justify-content: center;
+    align-items: center;
+    cursor: move;
+}
+
+.messageInputHeader{
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.5rem 1rem;
+    border-bottom: 1px solid gray
+}
+
+.inputContainer{
+    padding: 1rem;
+}
+
+.input{
+    width: 100%;
+    min-height: 16rem;
+}
+
+.saveHeader{
+    width: 100%;
+    padding: 0.6rem;
+    background-color: lightgray;
+}
+
+.saveHeader button{
+    margin-left: auto;
+    display: flex;
+    justify-content: end;
+    margin-right: 1.2rem;
+}
