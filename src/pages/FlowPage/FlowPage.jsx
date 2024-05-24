@@ -11,9 +11,12 @@ import { useDrag, useDrop } from 'react-dnd';
  
 import 'reactflow/dist/style.css';
 
+//When expanding and adding new types of nodes we will need to write a component for them and map them to a key in the customNodes variable
 const customNodes = {
   selectorNode: TextNode,
 };
+
+//We can define different kinds of nodes here and render them conditionally based on the type parameter, currently only the text node is rendered, that way we can expand the feature.
 
 const DraggableNode = ({type}) => {
   const getType = () => {
@@ -106,6 +109,9 @@ const FlowPage = () => {
       );
     }
 
+    //addNode accepts the type that is dragged from the sidebar and dropped into the flow div, based on that we assign the node type.
+    //DraggableNode(accepts type) => type passed on to useDrag => passed on to useDrop => passed on to addNode, we only need to send type param in draggable node
+    
     const addNode = (type) => {
         let nodeType = "";
         switch (type){
