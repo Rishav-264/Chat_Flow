@@ -1,5 +1,5 @@
 import { useCallback, useState, useEffect } from "react";
-import ReactFlow, { useNodesState, useEdgesState, addEdge, useReactFlow } from "reactflow";
+import ReactFlow, { useNodesState, useEdgesState, addEdge, useReactFlow, ReactFlowProvider } from "reactflow";
 import { toast } from "react-toastify";
 import style from "./flowPage.module.css";
 import { BiMessageRoundedDetail } from "react-icons/bi";
@@ -56,7 +56,7 @@ const DraggableNode = ({ type }) => {
   return <>{getNode()}</>;
 };
 
-const FlowPage = () => {
+const FlowPageContent = () => {
   const { screenToFlowPosition } = useReactFlow();
   const [selectedNodeId, setSelectedNodeId] = useState(null);
   const [selectedNodeIndex, setSelectedNodeIndex] = useState(null);
@@ -209,8 +209,12 @@ const FlowPage = () => {
   );
 };
 
-export default () => (
-  <ReactFlow>
-    <FlowPage />
-  </ReactFlow>
-);
+const FlowPage = () => {
+  return (
+    <ReactFlowProvider>
+      <FlowPageContent />
+    </ReactFlowProvider>
+  );
+};
+
+export default FlowPage;
