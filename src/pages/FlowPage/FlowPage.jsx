@@ -244,4 +244,12 @@ const FlowPage = () => {
   );
 };
 
+const FlowPage = () => {
+  return (
+    <ReactFlowProvider>
+      <FlowPageContent />
+    </ReactFlowProvider>
+  );
+};
+
 export default FlowPage;
