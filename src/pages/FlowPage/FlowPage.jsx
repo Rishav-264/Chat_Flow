@@ -1,78 +1,128 @@
-import { useCallback, useState, useEffect } from "react";
-import ReactFlow, { useNodesState, useEdgesState, addEdge } from "reactflow";
+import { useCallback, useState, useEffect, useRef } from "react";
+import ReactFlow, {
+  useNodesState,
+  useEdgesState,
+  addEdge,
+  useReactFlow,
+} from "reactflow";
 import { toast } from "react-toastify";
 import style from "./flowPage.module.css";
-import { BiMessageRoundedDetail } from "react-icons/bi";
 import TextNode from "../../components/FlowPage/TextNode/TextNode";
 import Sidebar from "../../components/FlowPage/Sidebar/Sidebar";
-import { nodeTypes } from "../utils/nodeTypes";
-import { useDrag, useDrop } from "react-dnd";
+import { useDnD } from "../utils/DnDContext";
 
 import "reactflow/dist/style.css";
 
-//When expanding and adding new types of nodes we will need to write a component for them and map them to a key in the customNodes variable
+/**
+ * Mapping of custom node types to React components.
+ * Each node type key corresponds to the `type` field in a node object.
+ * When expanding and adding new types of nodes we will need to write a component for them and map them to a key in the customNodes variable
+ */
 const customNodes = {
-  selectorNode: TextNode,
+  textNode: TextNode,
 };
 
-// We can define different kinds of nodes here and render them conditionally based on the type parameter,
-// currently only the text node is rendered,
-// that way we can expand the feature.
+// Unique ID generator for nodes
+let id = 0;
+const getId = () => `dndnode_${id++}`;
 
-const DraggableNode = ({ type }) => {
-  const getType = () => {
-    switch (type) {
-      case "text":
-        return nodeTypes.TEXT;
-      default:
-        throw new Error(`Unknown type: ${type}`);
-    }
-  };
-
-  const getNode = () => {
-    switch (type) {
-      case "text":
-        return (
-          <div className={style.node} ref={drag}>
-            <BiMessageRoundedDetail style={{ fontSize: "30px" }} />
-            Message
-          </div>
-        );
-      default:
-        return null;
-    }
-  };
-
-  const [{ isDragging }, drag] = useDrag(() => ({
-    type: getType(),
-    collect: (monitor) => ({
-      isDragging: !!monitor.isDragging(),
-    }),
-    item: () => {
-      return { type };
-    },
-  }));
-
-  return <>{getNode()}</>;
-};
-
+/**
+ * FlowPage Component
+ * -----------------
+ * Main component that renders the flow editor UI.
+ * Provides functionality to:
+ *  - Add nodes via drag-and-drop from the sidebar
+ *  - Connect nodes with edges
+ *  - Delete nodes
+ *  - Track selected nodes
+ *  - Validate flow connectivity before saving
+ */
 const FlowPage = () => {
+  /** Currently selected node ID and its index in nodes array */
   const [selectedNodeId, setSelectedNodeId] = useState(null);
-  const [selectedNodeIndex, setSelectedNodeIndex] = useState(null);
 
+  /** Reference to the ReactFlow container DOM element */
+  const reactFlowWrapper = useRef(null);
+
+  /** State hooks provided by ReactFlow */
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
+
+  /** Store currently selected node object */
   const [selectedNode, setSelectedNode] = useState({});
+
+  /** Tracks the number of edges connected to each node */
   const [nodeEdgesObject, setNodeEdgesObject] = useState({});
 
-  const [{ isOver }, drop] = useDrop(() => ({
-    accept: nodeTypes.TEXT,
-    drop: (item) => addNode(item?.type),
-    collect: (monitor) => ({
-      isOver: !!monitor.isOver(),
-    }),
-  }));
+  /** Node type set by drag-and-drop context */
+  const [type] = useDnD();
 
+  /** Helper from ReactFlow to convert screen coords -> flow coords */
+  const { screenToFlowPosition } = useReactFlow();
+
+  /**
+   * Handle drag-over event in the flow area.
+   * Ensures dragged nodes can be dropped.
+   */
+  const onDragOver = useCallback((event) => {
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "move";
+  }, []);
+
+  /**
+   * Handle node drop event.
+   * Creates a new node at the drop position with the dragged type.
+   */
+  const onDrop = useCallback(
+    (event) => {
+      event.preventDefault();
+
+      // check if the dropped element is valid
+      if (!type) {
+        return;
+      }
+
+      // Convert drop position to flow coordinates
+      const position = screenToFlowPosition({
+        x: event.clientX,
+        y: event.clientY,
+      });
+
+      // Create new node object
+      let id = getId();
+      const newNode = {
+        id,
+        type,
+        position,
+        data: {
+          setNodes: setNodes,
+          setEdges: setEdges,
+          id,
+          setSelectedNodeId: setSelectedNodeId,
+          deleteNode: deleteNode,
+          message: "test message",
+        },
+      };
+
+      // Add new node to state
+      setNodes((nds) => nds.concat(newNode));
+    },
+    [screenToFlowPosition, type]
+  );
+
+  /**
+   * Handle drag start for sidebar items.
+   * Sets the type in DnD context and adds it to the dataTransfer object.
+   */
+  const onDragStart = (event, nodeType) => {
+    setType(nodeType);
+    event.dataTransfer.setData("text/plain", nodeType);
+    event.dataTransfer.effectAllowed = "move";
+  };
+
+  /**
+   * Whenever selectedNodeId changes, find and set the selected node object.
+   */
   useEffect(() => {
     if (selectedNodeId !== null) {
       let node = nodes?.find((node) => node?.data?.id === selectedNodeId);
@@ -80,6 +130,10 @@ const FlowPage = () => {
     }
   }, [selectedNodeId, nodes]);
 
+  /**
+   * Handle connection between two nodes.
+   * Only allows one outgoing connection from a source node.
+   */
   const onConnect = useCallback(
     (params) => {
       let isAllowed = true;
@@ -98,52 +152,42 @@ const FlowPage = () => {
     [edges, nodes, setEdges]
   );
 
+  /**
+   * Delete a node by its ID.
+   * Also removes references from nodeEdgesObject.
+   */
   const deleteNode = (id) => {
     setNodes((prev) => prev?.filter((node) => node?.id !== id));
-  };
 
-  //addNode accepts the type that is dragged from the sidebar and dropped into the flow div, based on that we assign the node type.
-  //DraggableNode(accepts type) => type passed on to useDrag => passed on to useDrop => passed on to addNode, we only need to send type param in draggable node
-
-  const addNode = (type) => {
-    let nodeType = "";
-    switch (type) {
-      case "text":
-        nodeType = "selectorNode";
-        break;
-      default:
-        nodeType = "";
+    // rebuild nodeEdgesObject without the deleted node
+    let temp = nodeEdgesObject;
+    let obj = {};
+    for (let i of Object.keys(temp || {})) {
+      if (i !== id) {
+        obj = {
+          ...obj,
+          [i]: nodeEdgesObject?.[i],
+        };
+      }
     }
-    let id = Date.now();
-    setNodes((prev) => [
-      ...prev,
-      {
-        id: `node-${id}`,
-        position: { x: 0, y: 0 },
-        type: nodeType,
-        data: {
-          setNodes: setNodes,
-          setEdges: setEdges,
-          id: `node-${id}`,
-          setSelectedNodeId: setSelectedNodeId,
-          setSelectedNodeIndex: setSelectedNodeIndex,
-          deleteNode: deleteNode,
-          message: "test message",
-          index: prev?.length,
-        },
-      },
-    ]);
+    setNodeEdgesObject(obj);
   };
 
+  /**
+   * Recalculate nodeEdgesObject whenever nodes or edges change.
+   * Tracks how many edges are connected to each node.
+   */
   useEffect(() => {
     if (nodes && edges) {
       for (let i of nodes) {
+        // Reset edge counts for all nodes
         setNodeEdgesObject((prev) => ({
           ...prev,
           [i?.id]: 0,
         }));
       }
       for (let i of edges) {
+        // Increment edge counts for connected nodes
         setNodeEdgesObject((prev) => ({
           ...prev,
           [i?.source]: prev?.[i?.source] + 1,
@@ -153,9 +197,13 @@ const FlowPage = () => {
     }
   }, [nodes, edges]);
 
+  /**
+   * Validate flow before saving.
+   * Ensures that all nodes are connected to at least one edge.
+   */
   const onSubmit = () => {
     let isError = false;
-    for (let i of Object.keys(nodeEdgesObject)) {
+    for (let i of Object.keys(nodeEdgesObject || {})) {
       if (nodeEdgesObject?.[i] === 0) {
         isError = true;
         break;
@@ -175,20 +223,20 @@ const FlowPage = () => {
           selectedNode={selectedNode}
           selectedNodeId={selectedNodeId}
           onSubmit={onSubmit}
-          selectedNodeIndex={selectedNodeIndex}
-          DraggableNode={DraggableNode}
           setNodes={setNodes}
           setSelectedNodeId={setSelectedNodeId}
-          setSelectedNodeIndex={setSelectedNodeIndex}
         />
-        <div style={{ width: "70vw", height: "100vh" }} ref={drop}>
+        <div style={{ width: "70vw", height: "100vh" }} ref={reactFlowWrapper}>
           <ReactFlow
             nodes={nodes}
             edges={edges}
             onNodesChange={onNodesChange}
             onEdgesChange={onEdgesChange}
-            onConnect={onConnect}
             nodeTypes={customNodes}
+            onConnect={onConnect}
+            onDrop={onDrop}
+            onDragStart={onDragStart}
+            onDragOver={onDragOver}
           />
         </div>
       </div>

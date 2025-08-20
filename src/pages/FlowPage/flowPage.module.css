@@ -1,14 +1,3 @@
 .container{
     display: flex;
 }
-
-.node{
-    padding: 1rem 2rem;
-    border-radius: 1rem;
-    display: flex;
-    flex-direction: column;
-    border: 2px solid black;
-    justify-content: center;
-    align-items: center;
-    cursor: move;
-}
