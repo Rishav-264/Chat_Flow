@@ -67,7 +67,20 @@ const FlowPage = () => {
 
   const [{ isOver }, drop] = useDrop(() => ({
     accept: nodeTypes.TEXT,
-    drop: (item) => addNode(item?.type),
+    drop: (item, monitor) => {
+      const offset = monitor.getClientOffset();
+      const dropTargetRect = drop.current?.getBoundingClientRect();
+      
+      if (offset && dropTargetRect) {
+        const position = {
+          x: offset.x - dropTargetRect.left,
+          y: offset.y - dropTargetRect.top
+        };
+        addNode(item?.type, position);
+      } else {
+        addNode(item?.type);
+      }
+    },
     collect: (monitor) => ({
       isOver: !!monitor.isOver(),
     }),
@@ -105,7 +118,7 @@ const FlowPage = () => {
   //addNode accepts the type that is dragged from the sidebar and dropped into the flow div, based on that we assign the node type.
   //DraggableNode(accepts type) => type passed on to useDrag => passed on to useDrop => passed on to addNode, we only need to send type param in draggable node
 
-  const addNode = (type) => {
+  const addNode = (type, position = { x: 0, y: 0 }) => {
     let nodeType = "";
     switch (type) {
       case "text":
@@ -119,7 +132,7 @@ const FlowPage = () => {
       ...prev,
       {
         id: `node-${id}`,
-        position: { x: 0, y: 0 },
+        position: position,
         type: nodeType,
         data: {
           setNodes: setNodes,
